@@ -1,0 +1,60 @@
+name: Deploy Spring Boot Container to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-image:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-vps:
+    name: Deploy to Remote VPS
+    runs-on: ubuntu-latest
+    needs: build-image
+
+    steps:
+      - name: Thực thi câu lệnh triển khai trên VPS qua SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+            docker pull ghcr.io/${{ github.repository }}:latest || docker pull ghcr.io/${{ github.actor }}/app:latest || true
+            docker stop app || true
+            docker rm app || true
+            docker run -d --name app -p 8080:8080 ghcr.io/${{ github.repository }}:latest || docker run -d --name app -p 8080:8080 ghcr.io/${{ github.actor }}/app:latest || true
