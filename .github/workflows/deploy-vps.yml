@@ -28,7 +28,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: |
+            ghcr.io/${{ github.repository }}
+            ghcr.io/${{ github.actor }}/app
           tags: |
             type=raw,value=latest
 
@@ -50,11 +52,10 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT || 8686 }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
-            docker pull ghcr.io/${{ github.repository }}:latest || docker pull ghcr.io/${{ github.actor }}/app:latest || true
-            docker stop app || true
-            docker rm app || true
-            docker run -d --name app -p 8080:8080 ghcr.io/${{ github.repository }}:latest || docker run -d --name app -p 8080:8080 ghcr.io/${{ github.actor }}/app:latest || true
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/it-209-devops-fundamentals/session12-ex4-homework:latest || docker pull ghcr.io/${{ github.actor }}/app:latest
+            docker stop app || true && docker rm app || true && docker run -d --name app -p 8080:8080 ghcr.io/it-209-devops-fundamentals/session12-ex4-homework:latest
